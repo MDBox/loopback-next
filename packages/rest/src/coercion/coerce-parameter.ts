@@ -17,7 +17,10 @@ const debug = debugModule('loopback:rest:coercion');
  * @param data The raw data get from http request
  * @param schema The parameter's schema defined in OpenAPI specification
  */
-export function coerceParameter(data: string, spec: ParameterObject) {
+export function coerceParameter(
+  data: string | undefined | object,
+  spec: ParameterObject,
+) {
   const schema = spec.schema;
   if (!schema || isReferenceObject(schema)) {
     debug(
@@ -31,26 +34,60 @@ export function coerceParameter(data: string, spec: ParameterObject) {
   const validator = new Validator({parameterSpec: spec});
 
   validator.validateParamBeforeCoercion(data);
+  if (data === undefined) return data;
 
   switch (OAIType) {
     case 'byte':
+      if (typeof data === 'object')
+        throw RestHttpErrors.invalidData(data, spec.name);
       return Buffer.from(data, 'base64');
     case 'date':
-      return new Date(data);
+    case 'date-time':
+      if (typeof data === 'object')
+        throw RestHttpErrors.invalidData(data, spec.name);
+      if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
+      const coercedDate = new Date(data);
+      if (!isValidDateTime(coercedDate))
+        throw RestHttpErrors.invalidData(data, spec.name);
+      return coercedDate;
     case 'float':
     case 'double':
+      if (typeof data === 'object')
+        throw RestHttpErrors.invalidData(data, spec.name);
       return parseFloat(data);
     case 'number':
-      const coercedData = data ? Number(data) : undefined;
-      if (coercedData === undefined) return;
-      if (isNaN(coercedData)) throw RestHttpErrors.invalidData(data, spec.name);
-      return coercedData;
+      if (typeof data === 'object')
+        throw RestHttpErrors.invalidData(data, spec.name);
+      if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
+
+      const coercedNum = Number(data);
+      if (isNaN(coercedNum)) throw RestHttpErrors.invalidData(data, spec.name);
+
+      debug('data of type number is coerced to %s', coercedNum);
+      return coercedNum;
     case 'long':
       return Number(data);
     case 'integer':
-      return parseInt(data);
+      if (typeof data === 'object')
+        throw RestHttpErrors.invalidData(data, spec.name);
+      if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
+
+      const coercedInt = Number(data);
+      if (isNaN(coercedInt!)) throw RestHttpErrors.invalidData(data, spec.name);
+      if (!isSafeInteger(coercedInt!))
+        throw RestHttpErrors.exceedsMaxSafeInt(spec.name);
+      if (!Number.isInteger(coercedInt!))
+        throw RestHttpErrors.invalidData(data, spec.name);
+
+      debug('data of type integer is coerced to %s', coercedInt);
+      return coercedInt;
     case 'boolean':
-      return isTrue(data) ? true : isFalse(data) ? false : undefined;
+      if (typeof data === 'object')
+        throw RestHttpErrors.invalidData(data, spec.name);
+      if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
+      if (isTrue(data)) return true;
+      if (isFalse(data)) return false;
+      throw RestHttpErrors.invalidData(data, spec.name);
     case 'string':
     case 'password':
     // serialize will be supported in next PR
@@ -60,6 +97,10 @@ export function coerceParameter(data: string, spec: ParameterObject) {
   }
 }
 
+function isEmpty(data: string) {
+  debug('isEmpty %s', data);
+  return data === '';
+}
 /**
  * A set of truthy values. A data in this set will be coerced to `true`.
  *
@@ -67,7 +108,7 @@ export function coerceParameter(data: string, spec: ParameterObject) {
  * @returns The corresponding coerced boolean type
  */
 function isTrue(data: string): boolean {
-  return ['true', '1'].includes(data);
+  return ['TRUE', '1'].includes(data.toUpperCase());
 }
 
 /**
@@ -76,7 +117,15 @@ function isTrue(data: string): boolean {
  * @returns The corresponding coerced boolean type
  */
 function isFalse(data: string): boolean {
-  return ['false', '0'].includes(data);
+  return ['FALSE', '0'].includes(data.toUpperCase());
+}
+
+function isSafeInteger(data: number) {
+  return -Number.MAX_SAFE_INTEGER <= data && data <= Number.MAX_SAFE_INTEGER;
+}
+
+function isValidDateTime(data: Date) {
+  return isNaN(data.getTime()) ? false : true;
 }
 
 /**

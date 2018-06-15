@@ -9,8 +9,11 @@ export namespace RestHttpErrors {
     return new HttpErrors.BadRequest(msg);
   }
   export function invalidParamLocation(location: string): HttpErrors.HttpError {
-    return new HttpErrors.NotImplemented(
-      'Parameters with "in: ' + location + '" are not supported yet.',
-    );
+    const msg = `Parameters with "in: ${location}" are not supported yet.`;
+    return new HttpErrors.NotImplemented(msg);
+  }
+  export function exceedsMaxSafeInt(name: string): HttpErrors.HttpError {
+    const msg = `Value for parameter ${name} exceeds the max safe integer!`;
+    return new HttpErrors.BadRequest(msg);
   }
 }
