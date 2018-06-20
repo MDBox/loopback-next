@@ -4,7 +4,7 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {test} from './utils';
-import {RestHttpErrors} from './../../../';
+import {RestHttpErrors} from '../../../';
 import {ParameterLocation} from '@loopback/openapi-v3-types';
 
 const BOOLEAN_PARAM = {

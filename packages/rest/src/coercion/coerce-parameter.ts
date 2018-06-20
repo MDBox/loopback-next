@@ -11,11 +11,11 @@ import {
   getOAIPrimitiveType,
   isEmpty,
   isFalse,
-  isSafeInteger,
   isTrue,
   isValidDateTime,
+  matchDateFormat,
 } from './utils';
-
+const isRFC3339 = require('validator/lib/isRFC3339');
 const debug = debugModule('loopback:rest:coercion');
 
 /**
@@ -46,21 +46,17 @@ export function coerceParameter(
 
   switch (OAIType) {
     case 'byte':
-      if (typeof data === 'object')
-        throw RestHttpErrors.invalidData(data, spec.name);
-      return Buffer.from(data, 'base64');
+      return coerceBuffer(data, spec);
     case 'date':
+      return coerceDatetime(data, spec, true);
     case 'date-time':
       return coerceDatetime(data, spec);
     case 'float':
     case 'double':
-      if (typeof data === 'object')
-        throw RestHttpErrors.invalidData(data, spec.name);
-      return parseFloat(data);
     case 'number':
       return coerceNumber(data, spec);
     case 'long':
-      return Number(data);
+      return coerceInteger(data, spec, true);
     case 'integer':
       return coerceInteger(data, spec);
     case 'boolean':
@@ -74,10 +70,27 @@ export function coerceParameter(
   }
 }
 
-function coerceDatetime(data: string | object, spec: ParameterObject) {
+function coerceBuffer(data: string | object, spec: ParameterObject) {
   if (typeof data === 'object')
     throw RestHttpErrors.invalidData(data, spec.name);
-  if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
+  return Buffer.from(data, 'base64');
+}
+
+function coerceDatetime(
+  data: string | object,
+  spec: ParameterObject,
+  dateOnly?: boolean,
+) {
+  if (typeof data === 'object' || isEmpty(data))
+    throw RestHttpErrors.invalidData(data, spec.name);
+
+  if (dateOnly) {
+    if (!matchDateFormat(data))
+      throw RestHttpErrors.invalidData(data, spec.name);
+  } else {
+    if (!isRFC3339(data)) throw RestHttpErrors.invalidData(data, spec.name);
+  }
+
   const coercedDate = new Date(data);
   if (!isValidDateTime(coercedDate))
     throw RestHttpErrors.invalidData(data, spec.name);
@@ -85,9 +98,8 @@ function coerceDatetime(data: string | object, spec: ParameterObject) {
 }
 
 function coerceNumber(data: string | object, spec: ParameterObject) {
-  if (typeof data === 'object')
+  if (typeof data === 'object' || isEmpty(data))
     throw RestHttpErrors.invalidData(data, spec.name);
-  if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
 
   const coercedNum = Number(data);
   if (isNaN(coercedNum)) throw RestHttpErrors.invalidData(data, spec.name);
@@ -96,26 +108,32 @@ function coerceNumber(data: string | object, spec: ParameterObject) {
   return coercedNum;
 }
 
-function coerceInteger(data: string | object, spec: ParameterObject) {
-  if (typeof data === 'object')
+function coerceInteger(
+  data: string | object,
+  spec: ParameterObject,
+  isLong?: boolean,
+) {
+  if (typeof data === 'object' || isEmpty(data))
     throw RestHttpErrors.invalidData(data, spec.name);
-  if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
 
   const coercedInt = Number(data);
   if (isNaN(coercedInt!)) throw RestHttpErrors.invalidData(data, spec.name);
-  if (!isSafeInteger(coercedInt!))
-    throw RestHttpErrors.exceedsMaxSafeInt(spec.name);
-  if (!Number.isInteger(coercedInt!))
-    throw RestHttpErrors.invalidData(data, spec.name);
+
+  if (isLong) {
+    if (!Number.isInteger(coercedInt))
+      throw RestHttpErrors.invalidData(data, spec.name);
+  } else {
+    if (!Number.isSafeInteger(coercedInt))
+      throw RestHttpErrors.invalidData(data, spec.name);
+  }
 
   debug('data of type integer is coerced to %s', coercedInt);
   return coercedInt;
 }
 
 function coerceBoolean(data: string | object, spec: ParameterObject) {
-  if (typeof data === 'object')
+  if (typeof data === 'object' || isEmpty(data))
     throw RestHttpErrors.invalidData(data, spec.name);
-  if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
   if (isTrue(data)) return true;
   if (isFalse(data)) return false;
   throw RestHttpErrors.invalidData(data, spec.name);

@@ -12,8 +12,4 @@ export namespace RestHttpErrors {
     const msg = `Parameters with "in: ${location}" are not supported yet.`;
     return new HttpErrors.NotImplemented(msg);
   }
-  export function exceedsMaxSafeInt(name: string): HttpErrors.HttpError {
-    const msg = `Value for parameter ${name} exceeds the max safe integer!`;
-    return new HttpErrors.BadRequest(msg);
-  }
 }

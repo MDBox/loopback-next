@@ -4,7 +4,7 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {test} from './utils';
-import {RestHttpErrors} from './../../../';
+import {RestHttpErrors} from '../../../';
 import {ParameterLocation} from '@loopback/openapi-v3-types';
 
 const DATETIME_PARAM = {
@@ -48,16 +48,37 @@ describe('coerce param from string to date - optional', function() {
     );
     test(
       DATETIME_PARAM,
+      '2016-05-19t13:28:51z',
+      new Date('2016-05-19t13:28:51z'),
+    );
+    test(
+      DATETIME_PARAM,
+      '2016-05-19T13:28:51.299Z',
+      new Date('2016-05-19T13:28:51.299Z'),
+    );
+    test(
+      DATETIME_PARAM,
       '2016-05-19T13:28:51-08:00',
       new Date('2016-05-19T13:28:51-08:00'),
     );
+    test(
+      DATETIME_PARAM,
+      '2016-05-19T13:28:51.299-08:00',
+      new Date('2016-05-19T13:28:51.299-08:00'),
+    );
   });
 
-  context.skip('invalid values should trigger ERROR_BAD_REQUEST', () => {
-    const err = RestHttpErrors.invalidData('2016-01-01', DATETIME_PARAM.name);
-    test(DATETIME_PARAM, '2016-01-01', err);
-    test(DATETIME_PARAM, '2016-02-31T13:28:51Z', err);
-    test(DATETIME_PARAM, '2016-05-19T13:28:51.299Z', err);
+  context('invalid values should trigger ERROR_BAD_REQUEST', () => {
+    test(
+      DATETIME_PARAM,
+      '2016-01-01',
+      RestHttpErrors.invalidData('2016-01-01', DATETIME_PARAM.name),
+    );
+    test(
+      DATETIME_PARAM,
+      '2016-04-32T13:28:51Z',
+      RestHttpErrors.invalidData('2016-04-32T13:28:51Z', DATETIME_PARAM.name),
+    );
   });
 
   context('empty values trigger ERROR_BAD_REQUEST', () => {

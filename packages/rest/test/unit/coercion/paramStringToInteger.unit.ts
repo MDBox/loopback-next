@@ -4,7 +4,7 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {test} from './utils';
-import {RestHttpErrors} from './../../../';
+import {RestHttpErrors} from '../../../';
 import {ParameterLocation} from '@loopback/openapi-v3-types';
 
 const INT32_PARAM = {
@@ -55,7 +55,7 @@ describe('coerce param from string to integer - required', function() {
 });
 
 describe('coerce param from string to integer - optional', function() {
-  context('valid values', async () => {
+  context('valid values', () => {
     test(INTEGER_PARAM, '0', 0);
     test(INTEGER_PARAM, '1', 1);
     test(INTEGER_PARAM, '-1', -1);
@@ -63,12 +63,33 @@ describe('coerce param from string to integer - optional', function() {
 
   context(
     'integers larger than MAX_SAFE_INTEGER should trigger ERROR_BAD_REQUEST',
-    async () => {
-      const err = RestHttpErrors.exceedsMaxSafeInt(REQUIRED_INTEGER_PARAM.name);
-      test(INTEGER_PARAM, '2343546576878989879789', err);
-      test(INTEGER_PARAM, '-2343546576878989879789', err);
-      test(INTEGER_PARAM, '1.234e+30', err);
-      test(INTEGER_PARAM, '-1.234e+30', err);
+    () => {
+      test(
+        INTEGER_PARAM,
+        '2343546576878989879789',
+        RestHttpErrors.invalidData(
+          '2343546576878989879789',
+          REQUIRED_INTEGER_PARAM.name,
+        ),
+      );
+      test(
+        INTEGER_PARAM,
+        '-2343546576878989879789',
+        RestHttpErrors.invalidData(
+          '-2343546576878989879789',
+          REQUIRED_INTEGER_PARAM.name,
+        ),
+      );
+      test(
+        INTEGER_PARAM,
+        '1.234e+30',
+        RestHttpErrors.invalidData('1.234e+30', REQUIRED_INTEGER_PARAM.name),
+      );
+      test(
+        INTEGER_PARAM,
+        '-1.234e+30',
+        RestHttpErrors.invalidData('-1.234e+30', REQUIRED_INTEGER_PARAM.name),
+      );
     },
   );
 

@@ -5,7 +5,7 @@
 
 import {test} from './utils';
 import {ParameterLocation} from '@loopback/openapi-v3-types';
-import {RestHttpErrors} from './../../../';
+import {RestHttpErrors} from '../../../';
 
 const NUMBER_PARAM = {
   in: <ParameterLocation>'path',

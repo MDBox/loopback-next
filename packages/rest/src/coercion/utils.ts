@@ -4,7 +4,6 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import * as debugModule from 'debug';
-
 const debug = debugModule('loopback:rest:coercion');
 
 export function isEmpty(data: string) {
@@ -30,14 +29,17 @@ export function isFalse(data: string): boolean {
   return ['FALSE', '0'].includes(data.toUpperCase());
 }
 
-export function isSafeInteger(data: number) {
-  return -Number.MAX_SAFE_INTEGER <= data && data <= Number.MAX_SAFE_INTEGER;
-}
-
 export function isValidDateTime(data: Date) {
   return isNaN(data.getTime()) ? false : true;
 }
 
+const REGEX_RFC3339_DATE = /^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])$/;
+
+export function matchDateFormat(date: string) {
+  const pattern = new RegExp(REGEX_RFC3339_DATE);
+  debug('matchDateFormat: %s', pattern.test(date));
+  return pattern.test(date);
+}
 /**
  * Return the corresponding OpenAPI data type given an OpenAPI schema
  *
@@ -65,10 +67,13 @@ export function getOAIPrimitiveType(type?: string, format?: string) {
   }
   if (type === 'boolean') return 'boolean';
   if (type === 'number')
-    return format === 'float'
-      ? 'float'
-      : format === 'double'
-        ? 'double'
-        : 'number';
+    switch (format) {
+      case 'float':
+        return 'float';
+      case 'double':
+        return 'double';
+      default:
+        return 'number';
+    }
   if (type === 'integer') return format === 'int64' ? 'long' : 'integer';
 }
