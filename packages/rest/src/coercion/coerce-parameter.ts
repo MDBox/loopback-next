@@ -7,6 +7,14 @@ import {ParameterObject, isReferenceObject} from '@loopback/openapi-v3-types';
 import {Validator} from './validator';
 import * as debugModule from 'debug';
 import {RestHttpErrors} from '../';
+import {
+  getOAIPrimitiveType,
+  isEmpty,
+  isFalse,
+  isSafeInteger,
+  isTrue,
+  isValidDateTime,
+} from './utils';
 
 const debug = debugModule('loopback:rest:coercion');
 
@@ -43,51 +51,20 @@ export function coerceParameter(
       return Buffer.from(data, 'base64');
     case 'date':
     case 'date-time':
-      if (typeof data === 'object')
-        throw RestHttpErrors.invalidData(data, spec.name);
-      if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
-      const coercedDate = new Date(data);
-      if (!isValidDateTime(coercedDate))
-        throw RestHttpErrors.invalidData(data, spec.name);
-      return coercedDate;
+      return coerceDatetime(data, spec);
     case 'float':
     case 'double':
       if (typeof data === 'object')
         throw RestHttpErrors.invalidData(data, spec.name);
       return parseFloat(data);
     case 'number':
-      if (typeof data === 'object')
-        throw RestHttpErrors.invalidData(data, spec.name);
-      if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
-
-      const coercedNum = Number(data);
-      if (isNaN(coercedNum)) throw RestHttpErrors.invalidData(data, spec.name);
-
-      debug('data of type number is coerced to %s', coercedNum);
-      return coercedNum;
+      return coerceNumber(data, spec);
     case 'long':
       return Number(data);
     case 'integer':
-      if (typeof data === 'object')
-        throw RestHttpErrors.invalidData(data, spec.name);
-      if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
-
-      const coercedInt = Number(data);
-      if (isNaN(coercedInt!)) throw RestHttpErrors.invalidData(data, spec.name);
-      if (!isSafeInteger(coercedInt!))
-        throw RestHttpErrors.exceedsMaxSafeInt(spec.name);
-      if (!Number.isInteger(coercedInt!))
-        throw RestHttpErrors.invalidData(data, spec.name);
-
-      debug('data of type integer is coerced to %s', coercedInt);
-      return coercedInt;
+      return coerceInteger(data, spec);
     case 'boolean':
-      if (typeof data === 'object')
-        throw RestHttpErrors.invalidData(data, spec.name);
-      if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
-      if (isTrue(data)) return true;
-      if (isFalse(data)) return false;
-      throw RestHttpErrors.invalidData(data, spec.name);
+      return coerceBoolean(data, spec);
     case 'string':
     case 'password':
     // serialize will be supported in next PR
@@ -97,68 +74,49 @@ export function coerceParameter(
   }
 }
 
-function isEmpty(data: string) {
-  debug('isEmpty %s', data);
-  return data === '';
-}
-/**
- * A set of truthy values. A data in this set will be coerced to `true`.
- *
- * @param data The raw data get from http request
- * @returns The corresponding coerced boolean type
- */
-function isTrue(data: string): boolean {
-  return ['TRUE', '1'].includes(data.toUpperCase());
+function coerceDatetime(data: string | object, spec: ParameterObject) {
+  if (typeof data === 'object')
+    throw RestHttpErrors.invalidData(data, spec.name);
+  if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
+  const coercedDate = new Date(data);
+  if (!isValidDateTime(coercedDate))
+    throw RestHttpErrors.invalidData(data, spec.name);
+  return coercedDate;
 }
 
-/**
- * A set of falsy values. A data in this set will be coerced to `false`.
- * @param data The raw data get from http request
- * @returns The corresponding coerced boolean type
- */
-function isFalse(data: string): boolean {
-  return ['FALSE', '0'].includes(data.toUpperCase());
+function coerceNumber(data: string | object, spec: ParameterObject) {
+  if (typeof data === 'object')
+    throw RestHttpErrors.invalidData(data, spec.name);
+  if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
+
+  const coercedNum = Number(data);
+  if (isNaN(coercedNum)) throw RestHttpErrors.invalidData(data, spec.name);
+
+  debug('data of type number is coerced to %s', coercedNum);
+  return coercedNum;
 }
 
-function isSafeInteger(data: number) {
-  return -Number.MAX_SAFE_INTEGER <= data && data <= Number.MAX_SAFE_INTEGER;
+function coerceInteger(data: string | object, spec: ParameterObject) {
+  if (typeof data === 'object')
+    throw RestHttpErrors.invalidData(data, spec.name);
+  if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
+
+  const coercedInt = Number(data);
+  if (isNaN(coercedInt!)) throw RestHttpErrors.invalidData(data, spec.name);
+  if (!isSafeInteger(coercedInt!))
+    throw RestHttpErrors.exceedsMaxSafeInt(spec.name);
+  if (!Number.isInteger(coercedInt!))
+    throw RestHttpErrors.invalidData(data, spec.name);
+
+  debug('data of type integer is coerced to %s', coercedInt);
+  return coercedInt;
 }
 
-function isValidDateTime(data: Date) {
-  return isNaN(data.getTime()) ? false : true;
-}
-
-/**
- * Return the corresponding OpenAPI data type given an OpenAPI schema
- *
- * @param type The type in an OpenAPI schema specification
- * @param format The format in an OpenAPI schema specification
- */
-function getOAIPrimitiveType(type?: string, format?: string) {
-  // serizlize will be supported in next PR
-  if (type === 'object' || type === 'array') return 'serialize';
-  if (type === 'string') {
-    switch (format) {
-      case 'byte':
-        return 'byte';
-      case 'binary':
-        return 'binary';
-      case 'date':
-        return 'date';
-      case 'date-time':
-        return 'date-time';
-      case 'password':
-        return 'password';
-      default:
-        return 'string';
-    }
-  }
-  if (type === 'boolean') return 'boolean';
-  if (type === 'number')
-    return format === 'float'
-      ? 'float'
-      : format === 'double'
-        ? 'double'
-        : 'number';
-  if (type === 'integer') return format === 'int64' ? 'long' : 'integer';
+function coerceBoolean(data: string | object, spec: ParameterObject) {
+  if (typeof data === 'object')
+    throw RestHttpErrors.invalidData(data, spec.name);
+  if (isEmpty(data)) throw RestHttpErrors.invalidData(data, spec.name);
+  if (isTrue(data)) return true;
+  if (isFalse(data)) return false;
+  throw RestHttpErrors.invalidData(data, spec.name);
 }
